@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { parseJson } from '../utils/api';
+import { predictPriority } from '../utils/priorityModel';
 import NurseCall from '../components/NurseCall';
 import { PhoneIcon, LaptopIcon } from '../components/CallIcons';
 import styles from './NurseCase.module.css';
@@ -154,6 +155,16 @@ export default function NurseCase() {
       </div>
       <section className={styles.triage}>
         <h2>Triage</h2>
+        {(() => {
+          const ml = case_.ml_level != null && case_.ml_confidence != null
+            ? { level: case_.ml_level, confidence: case_.ml_confidence }
+            : predictPriority(case_);
+          return (
+            <p className={styles.mlSuggestion}>
+              <strong>ML priority:</strong> Level {ml.level} ({Math.round(ml.confidence * 100)}% confidence) — supervise and override if needed.
+            </p>
+          );
+        })()}
         <p><strong>Automated level:</strong> {case_.automated_triage_level} – {case_.triage_label}</p>
         {case_.overridden_at && (
           <p className={styles.overrideNote}>
@@ -187,7 +198,7 @@ export default function NurseCase() {
       )}
 
       <section className={styles.actions}>
-        <h2>Edit & actions</h2>
+        <h2>Supervise & override</h2>
         {message && <div className={styles.message}>{message}</div>}
         <form onSubmit={handleSaveEdit} className={styles.form}>
           <label>

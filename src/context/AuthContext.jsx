@@ -1,15 +1,8 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import { parseJson } from '../utils/api';
-import { mockApi } from '../utils/mockApi';
 
 const AuthContext = createContext(null);
 const API = '/api';
-const DEMO_TOKEN_PREFIX = 'demo-';
-const DEMO_USER_KEY = 'bright_demo_user';
-
-function isDemoToken(token) {
-  return token && (token === 'demo-patient' || token === 'demo-nurse' || token === 'demo-doctor');
-}
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
@@ -22,17 +15,6 @@ export function AuthProvider({ children }) {
       setLoading(false);
       return;
     }
-    // Demo mode: no API call, restore user from localStorage
-    if (isDemoToken(token)) {
-      try {
-        const stored = localStorage.getItem(DEMO_USER_KEY);
-        const u = stored ? JSON.parse(stored) : null;
-        if (u?.id) setUser(u);
-      } catch (_) {}
-      setLoading(false);
-      return;
-    }
-    // Real API
     fetch(`${API}/auth/me`, { headers: { Authorization: `Bearer ${token}` } })
       .then(async (r) => {
         const data = await parseJson(r);
@@ -64,13 +46,21 @@ export function AuthProvider({ children }) {
   };
 
   const register = async (email, password, role = 'patient', full_name) => {
-    const res = await fetch(`${API}/auth/register`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password, role, full_name }),
-    });
+    let res;
+    try {
+      res = await fetch(`${API}/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password, role, full_name }),
+      });
+    } catch (err) {
+      throw new Error('Cannot reach server. Is the backend running? Start it with: npm run server');
+    }
     const data = await parseJson(res);
-    if (!res.ok) throw new Error(data.error || 'Registration failed');
+    if (!res.ok) {
+      const msg = data?.error || data?.message || `Request failed (${res.status})`;
+      throw new Error(msg);
+    }
     if (!data.token) throw new Error('Server returned invalid response. Is the backend running?');
     localStorage.setItem('bright_token', data.token);
     setToken(data.token);
@@ -78,29 +68,13 @@ export function AuthProvider({ children }) {
     return data;
   };
 
-  /** Log in without backend: use demo data stored in localStorage. */
-  const demoLogin = (role) => {
-    const roleUsers = { nurse: { id: 2, email: 'nurse@demo.com', name: 'Demo Nurse' }, doctor: { id: 3, email: 'doctor@demo.com', name: 'Demo Doctor' }, patient: { id: 1, email: 'patient@demo.com', name: 'Demo Patient' } };
-    const r = roleUsers[role] || roleUsers.patient;
-    const u = { id: r.id, email: r.email, role, full_name: r.name };
-    const t = DEMO_TOKEN_PREFIX + role;
-    localStorage.setItem('bright_token', t);
-    localStorage.setItem(DEMO_USER_KEY, JSON.stringify(u));
-    setToken(t);
-    setUser(u);
-  };
-
   const logout = () => {
     localStorage.removeItem('bright_token');
-    localStorage.removeItem(DEMO_USER_KEY);
     setToken(null);
     setUser(null);
   };
 
   const authFetch = (path, options = {}) => {
-    if (isDemoToken(token) && user) {
-      return mockApi(path, options, user);
-    }
     return fetch(`${API}${path}`, {
       ...options,
       headers: { ...options.headers, Authorization: `Bearer ${token}` },
@@ -108,7 +82,7 @@ export function AuthProvider({ children }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, register, demoLogin, logout, authFetch }}>
+    <AuthContext.Provider value={{ user, token, loading, login, register, logout, authFetch }}>
       {children}
     </AuthContext.Provider>
   );

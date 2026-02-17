@@ -16,7 +16,7 @@ router.post('/register', async (req, res) => {
     const { rows } = await pool.query(
       `INSERT INTO users (email, password_hash, role, full_name) VALUES ($1, $2, $3, $4)
        RETURNING id, email, role, full_name, created_at`,
-      [email, hash, role === 'nurse' ? 'nurse' : 'patient', full_name || null]
+      [email, hash, ['nurse', 'doctor'].includes(role) ? role : 'patient', full_name || null]
     );
     const user = rows[0];
     await logAudit({ userId: user.id, action: 'user_register', resourceType: 'user', resourceId: user.id, details: { role: user.role } });

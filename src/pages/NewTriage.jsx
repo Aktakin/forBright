@@ -1,8 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { parseJson } from '../utils/api';
-import { submitTriageAsGuest } from '../utils/mockApi';
+import { parseJson, sendOtp, verifyOtp, getPatientVerified, setPatientVerified, getGuestToken, clearGuestToken } from '../utils/api';
 import styles from './NewTriage.module.css';
 
 const SYMPTOM_OPTIONS = [
@@ -35,6 +34,67 @@ export default function NewTriage() {
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState(null);
   const { user, authFetch } = useAuth();
+
+  const [otpEmail, setOtpEmail] = useState('');
+  const [otpCode, setOtpCode] = useState('');
+  const [otpSent, setOtpSent] = useState(false);
+  const [demoCode, setDemoCode] = useState(null);
+  const [otpError, setOtpError] = useState('');
+  const [verifiedEmail, setVerifiedEmail] = useState(() => getPatientVerified());
+
+  useEffect(() => {
+    setVerifiedEmail(getPatientVerified());
+  }, []);
+
+  const isStaff = user?.role === 'nurse' || user?.role === 'doctor';
+  const needsOtp = !isStaff && !verifiedEmail;
+
+  const handleSendOtp = async (e) => {
+    e.preventDefault();
+    setOtpError('');
+    const email = otpEmail.trim();
+    if (!email) {
+      setOtpError('Please enter your email.');
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const data = await sendOtp(email);
+      if (data.demo) {
+        setDemoCode(data.code);
+      }
+      setOtpSent(true);
+      setOtpCode('');
+    } catch (err) {
+      setOtpError(err.message || 'Failed to send OTP');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleVerifyOtp = async (e) => {
+    e.preventDefault();
+    setOtpError('');
+    if (!otpCode.trim()) {
+      setOtpError('Please enter the code.');
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await verifyOtp(otpEmail.trim(), otpCode.trim());
+      setPatientVerified(otpEmail.trim());
+      setVerifiedEmail(otpEmail.trim());
+      setOtpSent(false);
+      setOtpEmail('');
+      setOtpCode('');
+      setDemoCode(null);
+    } catch (err) {
+      setOtpError(err.message || 'Verification failed');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const navigate = useNavigate();
 
   const toggleSymptom = (id) => {
@@ -57,8 +117,22 @@ export default function NewTriage() {
         return;
       }
       if (!user) {
-        const data = submitTriageAsGuest(payload);
-        setResult(data);
+        const guest_token = getGuestToken();
+        if (!guest_token) {
+          setResult({ error: 'Please verify your email with the OTP first.' });
+          setSubmitting(false);
+          return;
+        }
+        const res = await fetch('/api/triage/submit-guest', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ guest_token, ...payload }),
+        });
+        const data = await parseJson(res);
+        if (!res.ok) throw new Error(data.error || 'Submit failed');
+        if (!data.id) throw new Error('Server returned invalid response.');
+        setResult({ ...data, triage_label: data.triage_label });
+        clearGuestToken();
         setSubmitting(false);
         return;
       }
@@ -92,9 +166,68 @@ export default function NewTriage() {
     );
   }
 
+  if (needsOtp) {
+    return (
+      <div className={styles.wrap}>
+        <h1>Verify with email</h1>
+        <p className={styles.intro}>Enter your email to receive a one-time code. No account or password needed.</p>
+        {otpError && <div className={styles.error}>{otpError}</div>}
+        {!otpSent ? (
+          <form onSubmit={handleSendOtp} className={styles.form}>
+            <section>
+              <label>
+                Email
+                <input
+                  type="email"
+                  value={otpEmail}
+                  onChange={(e) => setOtpEmail(e.target.value)}
+                  placeholder="you@example.com"
+                  autoComplete="email"
+                />
+              </label>
+            </section>
+            <button type="submit" disabled={submitting}>{submitting ? 'Sending…' : 'Send OTP'}</button>
+          </form>
+        ) : (
+          <form onSubmit={handleVerifyOtp} className={styles.form}>
+            {demoCode && (
+              <div className={styles.demoOtp}>
+                <strong>Demo:</strong> Your OTP is <code>{demoCode}</code>
+              </div>
+            )}
+            <section>
+              <label>
+                Enter the 6-digit code sent to {otpEmail}
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={6}
+                  value={otpCode}
+                  onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
+                  placeholder="000000"
+                  autoComplete="one-time-code"
+                />
+              </label>
+            </section>
+            <div className={styles.otpActions}>
+              <button type="submit" disabled={submitting}>{submitting ? 'Verifying…' : 'Verify'}</button>
+              <button type="button" className={styles.secondary} onClick={() => { setOtpSent(false); setDemoCode(null); setOtpError(''); }}>Use different email</button>
+            </div>
+          </form>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className={styles.wrap}>
       <h1>Remote triage</h1>
+      {verifiedEmail && (
+        <p className={styles.verifiedAs}>
+          Verified as <strong>{verifiedEmail}</strong>
+          <button type="button" className={styles.linkBtn} onClick={() => { clearPatientVerified(); clearGuestToken(); setVerifiedEmail(null); }}>Use different email</button>
+        </p>
+      )}
       <p className={styles.intro}>Submit your symptoms and urgency. You will receive a preliminary triage level before arriving at the ED.</p>
       {result?.error && <div className={styles.error}>{result.error}</div>}
       <form onSubmit={handleSubmit} className={styles.form}>

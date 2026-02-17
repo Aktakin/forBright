@@ -7,7 +7,7 @@ export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const { login, demoLogin } = useAuth();
+  const { login } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
@@ -21,31 +21,9 @@ export default function Login() {
     }
   };
 
-  const handleDemo = (role) => {
-    demoLogin(role);
-    if (role === 'nurse') navigate('/nurse');
-    else if (role === 'doctor') navigate('/doctor');
-    else navigate('/');
-  };
-
   return (
     <div className={styles.wrap}>
-      <h1>Log in</h1>
-
-      <div className={styles.demoBlock}>
-        <p className={styles.demoLabel}>No backend? Use demo (no database):</p>
-        <div className={styles.demoButtons}>
-          <button type="button" className={styles.demoBtn} onClick={() => handleDemo('patient')}>
-            Enter as Patient
-          </button>
-          <button type="button" className={styles.demoBtn} onClick={() => handleDemo('nurse')}>
-            Enter as Nurse
-          </button>
-          <button type="button" className={styles.demoBtn} onClick={() => handleDemo('doctor')}>
-            Enter as Doctor
-          </button>
-        </div>
-      </div>
+      <h1>Staff sign in</h1>
 
       <form onSubmit={handleSubmit} className={styles.form}>
         {error && <div className={styles.error}>{error}</div>}
@@ -60,7 +38,10 @@ export default function Login() {
         <button type="submit">Log in</button>
       </form>
       <p className={styles.foot}>
-        Staff only. Patients submit triage without logging in.
+        Nurses and doctors. Patients use Start triage without an account.
+      </p>
+      <p className={styles.foot}>
+        <Link to="/staff/register">Create staff account</Link>
       </p>
     </div>
   );

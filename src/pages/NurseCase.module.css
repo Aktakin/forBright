@@ -64,6 +64,15 @@
   font-size: 0.9rem;
 }
 
+.mlSuggestion {
+  padding: 0.5rem 0.75rem;
+  background: rgba(34, 211, 238, 0.08);
+  border-left: 3px solid var(--accent);
+  border-radius: 0 6px 6px 0;
+  margin-bottom: 0.6rem;
+  font-size: 0.9rem;
+}
+
 .overrideNote {
   color: var(--warning);
   font-size: 0.85rem;

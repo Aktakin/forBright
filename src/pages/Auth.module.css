@@ -76,6 +76,15 @@
   font-size: 0.9rem;
 }
 
+.foot a {
+  color: var(--accent);
+  font-weight: 500;
+  text-decoration: none;
+}
+.foot a:hover {
+  text-decoration: underline;
+}
+
 .demoBlock {
   margin-bottom: 1.25rem;
   padding: 1rem 1.1rem;

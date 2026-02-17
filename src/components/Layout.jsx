@@ -14,12 +14,12 @@ export default function Layout() {
   return (
     <div className={styles.layout}>
       <header className={styles.header}>
-        <Link to="/" className={styles.logo}>Bright</Link>
+        <Link to="/" className={styles.logo}>e - Triage</Link>
         <nav className={styles.nav}>
           {!user && (
             <>
               <Link to="/triage/new">Start triage</Link>
-              <Link to="/login">Log in</Link>
+              <Link to="/staff">Staff</Link>
             </>
           )}
           {user?.role === 'nurse' && (

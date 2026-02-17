@@ -4,6 +4,7 @@
  * Guests (no login) submit with patient_id: 0.
  */
 import { computeAutomatedTriageLevel, TRIAGE_LABELS } from './triageLogic';
+import { predictPriority, updateFromOverride } from './priorityModel';
 
 const CASES_KEY = 'bright_demo_cases';
 const AUDIT_KEY = 'bright_demo_audit';
@@ -70,6 +71,7 @@ export function submitTriageAsGuest(payload) {
   });
   const cases = getCases();
   const id = cases.length ? Math.max(...cases.map((x) => x.id)) + 1 : 1;
+  const ml = predictPriority({ symptoms: payload.symptoms || [], self_reported_urgency: payload.self_reported_urgency ?? 5, chief_complaint: payload.chief_complaint || '' });
   const newCase = {
     id,
     patient_id: 0,
@@ -78,6 +80,8 @@ export function submitTriageAsGuest(payload) {
     symptoms: payload.symptoms || [],
     self_reported_urgency: payload.self_reported_urgency ?? null,
     automated_triage_level: level,
+    ml_level: ml.level,
+    ml_confidence: ml.confidence,
     final_triage_level: null,
     overridden_by: null,
     overridden_at: null,
@@ -131,15 +135,24 @@ function seedMockData() {
   return true;
 }
 
+function enrichWithMl(c) {
+  if (c.ml_level != null && c.ml_confidence != null) return c;
+  const ml = predictPriority(c);
+  return { ...c, ml_level: c.ml_level ?? ml.level, ml_confidence: c.ml_confidence ?? ml.confidence };
+}
+
 function formatCasesForQueue() {
   const raw = getCases();
-  const cases = raw.map((c) => ({
-    ...c,
-    patient_name: DEMO_USERS[c.patient_id]?.full_name ?? 'Guest',
-    patient_email: DEMO_USERS[c.patient_id]?.email ?? '—',
-    triage_label: TRIAGE_LABELS[c.final_triage_level ?? c.automated_triage_level],
-  }));
-  cases.sort((a, b) => (a.automated_triage_level - b.automated_triage_level) || new Date(a.submitted_at) - new Date(b.submitted_at));
+  const cases = raw.map((c) => {
+    const enriched = enrichWithMl(c);
+    return {
+      ...enriched,
+      patient_name: DEMO_USERS[c.patient_id]?.full_name ?? 'Guest',
+      patient_email: DEMO_USERS[c.patient_id]?.email ?? '—',
+      triage_label: TRIAGE_LABELS[c.final_triage_level ?? c.automated_triage_level],
+    };
+  });
+  cases.sort((a, b) => (a.ml_level - b.ml_level) || (b.ml_confidence - a.ml_confidence) || new Date(a.submitted_at) - new Date(b.submitted_at));
   return cases;
 }
 
@@ -222,8 +235,9 @@ export function mockApi(path, options, user) {
     const cases = getCases();
     const c = cases.find((x) => x.id === caseId);
     if (!c) return Promise.resolve(fakeResponse({ error: 'Case not found' }, false));
+    const enriched = enrichWithMl(c);
     const withPatient = {
-      ...c,
+      ...enriched,
       patient_name: DEMO_USERS[c.patient_id]?.full_name ?? 'Guest',
       patient_email: DEMO_USERS[c.patient_id]?.email ?? '—',
       triage_label: TRIAGE_LABELS[c.final_triage_level ?? c.automated_triage_level],
@@ -256,6 +270,7 @@ export function mockApi(path, options, user) {
     };
     cases[idx] = updated;
     setCases(cases);
+    updateFromOverride(c, updated.final_triage_level);
     appendAudit({
       user_id: user.id,
       action: 'triage_override',
@@ -281,6 +296,7 @@ export function mockApi(path, options, user) {
     };
     cases[idx] = updated;
     setCases(cases);
+    updateFromOverride(c, updated.final_triage_level);
     appendAudit({ user_id: user.id, action: 'triage_complete', resource_type: 'triage_case', resource_id: id });
     return Promise.resolve(fakeResponse({ ...updated, triage_label: TRIAGE_LABELS[updated.final_triage_level] }));
   }

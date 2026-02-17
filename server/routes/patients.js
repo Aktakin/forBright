@@ -23,6 +23,24 @@ router.get('/my-cases', requireAuth, requireRole('patient'), async (req, res) =>
   }
 });
 
+router.get('/completed', requireAuth, requireRole('doctor'), async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT t.id, t.patient_id, t.demographics, t.chief_complaint, t.symptoms, t.self_reported_urgency,
+              t.automated_triage_level, t.final_triage_level, t.overridden_by, t.override_reason, t.status,
+              t.submitted_at, t.first_reviewed_at, t.completed_at,
+              u.full_name AS patient_name, u.email AS patient_email
+       FROM triage_cases t
+       JOIN users u ON u.id = t.patient_id
+       WHERE t.status = 'completed'
+       ORDER BY t.final_triage_level ASC NULLS LAST, t.completed_at DESC`
+    );
+    res.json(rows.map((r) => ({ ...r, triage_label: TRIAGE_LABELS[r.final_triage_level ?? r.automated_triage_level] })));
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 router.get('/queue', requireAuth, requireRole('nurse'), async (req, res) => {
   try {
     const { rows } = await pool.query(
@@ -44,6 +62,7 @@ router.get('/:id', requireAuth, async (req, res) => {
   try {
     const { id } = req.params;
     const isNurse = req.role === 'nurse';
+    const isDoctor = req.role === 'doctor';
     const { rows } = await pool.query(
       `SELECT t.*, u.full_name AS patient_name, u.email AS patient_email
        FROM triage_cases t JOIN users u ON u.id = t.patient_id WHERE t.id = $1`,
@@ -51,7 +70,7 @@ router.get('/:id', requireAuth, async (req, res) => {
     );
     const case_ = rows[0];
     if (!case_) return res.status(404).json({ error: 'Case not found' });
-    if (!isNurse && case_.patient_id !== req.userId) return res.status(403).json({ error: 'Access denied' });
+    if (!isNurse && !isDoctor && case_.patient_id !== req.userId) return res.status(403).json({ error: 'Access denied' });
     if (isNurse && case_.status === 'submitted') {
       await pool.query(
         `UPDATE triage_cases SET status = 'under_review', first_reviewed_at = COALESCE(first_reviewed_at, NOW()) WHERE id = $1`,

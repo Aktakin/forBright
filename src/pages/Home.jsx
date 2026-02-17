@@ -1,16 +1,9 @@
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import styles from './Home.module.css';
 
 export default function Home() {
-  const { user, demoLogin } = useAuth();
-  const navigate = useNavigate();
-
-  const handleDemo = (role) => {
-    demoLogin(role);
-    if (role === 'nurse') navigate('/nurse');
-    else if (role === 'doctor') navigate('/doctor');
-  };
+  const { user } = useAuth();
 
   return (
     <div className={styles.home}>
@@ -24,21 +17,9 @@ export default function Home() {
           Optimizing Emergency Department throughput via remote digital triage and synchronous telemedicine interventions.
         </p>
         {!user && (
-          <>
-            <div className={styles.demoRow}>
-              <span className={styles.demoLabel}>Demo (no backend):</span>
-              <button type="button" className={styles.demoBtn} onClick={() => handleDemo('nurse')}>
-                Enter as Nurse
-              </button>
-              <button type="button" className={styles.demoBtn} onClick={() => handleDemo('doctor')}>
-                Enter as Doctor
-              </button>
-            </div>
-            <div className={styles.actions}>
-              <Link to="/triage/new" className={styles.primary}>Start triage</Link>
-              <Link to="/login" className={styles.secondary}>Log in (staff)</Link>
-            </div>
-          </>
+          <div className={styles.actions}>
+            <Link to="/triage/new" className={styles.primary}>Start triage</Link>
+          </div>
         )}
         {user?.role === 'nurse' && (
           <div className={styles.actions}>

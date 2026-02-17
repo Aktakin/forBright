@@ -12,7 +12,7 @@ function formatDate(iso) {
 export default function DoctorDashboard() {
   const [completed, setCompleted] = useState([]);
   const [loading, setLoading] = useState(true);
-  const { authFetch, token } = useAuth();
+  const { authFetch } = useAuth();
 
   const load = () => {
     authFetch('/patients/completed')
@@ -29,7 +29,7 @@ export default function DoctorDashboard() {
     load();
     const id = setInterval(load, 20000);
     return () => clearInterval(id);
-  }, [authFetch, token]);
+  }, [authFetch]);
 
   if (loading) return <div className={styles.loading}>Loading completed triage…</div>;
 
