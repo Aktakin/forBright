@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { parseJson, sendOtp, verifyOtp, getPatientVerified, setPatientVerified, getGuestToken, clearGuestToken } from '../utils/api';
+import { parseJson, sendOtp, verifyOtp, getPatientVerified, setPatientVerified, getGuestToken, clearGuestToken, DEMO_ONLY, DEMO_GUEST_TOKEN } from '../utils/api';
 import styles from './NewTriage.module.css';
 
 const SYMPTOM_OPTIONS = [
@@ -38,7 +38,6 @@ export default function NewTriage() {
   const [otpEmail, setOtpEmail] = useState('');
   const [otpCode, setOtpCode] = useState('');
   const [otpSent, setOtpSent] = useState(false);
-  const [demoCode, setDemoCode] = useState(null);
   const [otpError, setOtpError] = useState('');
   const [verifiedEmail, setVerifiedEmail] = useState(() => getPatientVerified());
 
@@ -59,10 +58,7 @@ export default function NewTriage() {
     }
     setSubmitting(true);
     try {
-      const data = await sendOtp(email);
-      if (data.demo) {
-        setDemoCode(data.code);
-      }
+      await sendOtp(email);
       setOtpSent(true);
       setOtpCode('');
     } catch (err) {
@@ -87,7 +83,6 @@ export default function NewTriage() {
       setOtpSent(false);
       setOtpEmail('');
       setOtpCode('');
-      setDemoCode(null);
     } catch (err) {
       setOtpError(err.message || 'Verification failed');
     } finally {
@@ -120,6 +115,12 @@ export default function NewTriage() {
         const guest_token = getGuestToken();
         if (!guest_token) {
           setResult({ error: 'Please verify your email with the OTP first.' });
+          setSubmitting(false);
+          return;
+        }
+        if (DEMO_ONLY && guest_token === DEMO_GUEST_TOKEN) {
+          setResult({ id: 'demo', triage_label: 'Demo – not saved', note: 'Demo mode: triage was not sent to a server.' });
+          clearGuestToken();
           setSubmitting(false);
           return;
         }
@@ -190,28 +191,23 @@ export default function NewTriage() {
           </form>
         ) : (
           <form onSubmit={handleVerifyOtp} className={styles.form}>
-            {demoCode && (
-              <div className={styles.demoOtp}>
-                <strong>Demo:</strong> Your OTP is <code>{demoCode}</code>
-              </div>
-            )}
             <section>
               <label>
-                Enter the 6-digit code sent to {otpEmail}
+                Enter the code for {otpEmail}
                 <input
                   type="text"
                   inputMode="numeric"
-                  maxLength={6}
+                  maxLength={8}
                   value={otpCode}
                   onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
-                  placeholder="000000"
+                  placeholder="e.g. 05080307"
                   autoComplete="one-time-code"
                 />
               </label>
             </section>
             <div className={styles.otpActions}>
               <button type="submit" disabled={submitting}>{submitting ? 'Verifying…' : 'Verify'}</button>
-              <button type="button" className={styles.secondary} onClick={() => { setOtpSent(false); setDemoCode(null); setOtpError(''); }}>Use different email</button>
+              <button type="button" className={styles.secondary} onClick={() => { setOtpSent(false); setOtpError(''); }}>Use different email</button>
             </div>
           </form>
         )}

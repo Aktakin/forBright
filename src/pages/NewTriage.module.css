@@ -179,6 +179,40 @@
   font-weight: 500;
 }
 
+.otpCodeBox {
+  padding: 1.25rem 1.5rem;
+  background: var(--accent-dim);
+  border: 2px solid var(--accent);
+  border-radius: var(--radius);
+  margin-bottom: 1.25rem;
+  text-align: center;
+}
+.otpCodeLabel {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 0.5rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.otpCodeValue {
+  display: block;
+  font-size: 2rem;
+  font-weight: 700;
+  letter-spacing: 0.35em;
+  color: var(--accent);
+  margin: 0.5rem 0;
+  font-variant-numeric: tabular-nums;
+}
+.otpCodeBox .codeHint {
+  display: block;
+  margin-top: 0.5rem;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
 .demoOtp {
   padding: 0.75rem 1rem;
   background: var(--accent-dim);
@@ -192,6 +226,13 @@
   font-size: 1.1rem;
   letter-spacing: 0.1em;
   font-weight: 600;
+}
+.demoOtp .codeHint {
+  display: block;
+  margin-top: 0.35rem;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  font-weight: 400;
 }
 
 .otpActions {
